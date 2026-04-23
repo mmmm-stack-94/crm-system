@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>CRM System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 p-6 font-sans">
+
+  <h1 class="text-3xl font-bold mb-6">CRM 管理系統</h1>
+
+  <!-- 新增客戶 -->
+  <div class="bg-white p-4 rounded-xl shadow mb-6">
+    <h2 class="font-bold mb-2">新增客戶</h2>
+    <input id="company" placeholder="公司名稱" class="border p-2 mr-2">
+    <input id="contact" placeholder="聯絡人" class="border p-2 mr-2">
+    <button onclick="addCustomer()" class="bg-blue-500 text-white px-4 py-2 rounded">新增</button>
+  </div>
+
+  <!-- 客戶列表 -->
+  <div class="bg-white p-4 rounded-xl shadow mb-6">
+    <h2 class="font-bold mb-2">客戶列表</h2>
+    <ul id="customerList"></ul>
+  </div>
+
+  <!-- 新增案件 -->
+  <div class="bg-white p-4 rounded-xl shadow mb-6">
+    <h2 class="font-bold mb-2">新增案件</h2>
+    <input id="projectName" placeholder="案件名稱" class="border p-2 mr-2">
+    <select id="status" class="border p-2 mr-2">
+      <option>商機開發</option>
+      <option>報價</option>
+      <option>POC</option>
+      <option>成案</option>
+      <option>Fail</option>
+    </select>
+    <button onclick="addProject()" class="bg-green-500 text-white px-4 py-2 rounded">新增</button>
+  </div>
+
+  <!-- 案件列表 -->
+  <div class="bg-white p-4 rounded-xl shadow mb-6">
+    <h2 class="font-bold mb-2">案件列表</h2>
+    <ul id="projectList"></ul>
+  </div>
+
+  <!-- 新增進度 -->
+  <div class="bg-white p-4 rounded-xl shadow mb-6">
+    <h2 class="font-bold mb-2">新增進度</h2>
+    <input id="logText" placeholder="進度內容" class="border p-2 mr-2">
+    <button onclick="addLog()" class="bg-purple-500 text-white px-4 py-2 rounded">新增</button>
+  </div>
+
+  <!-- 進度列表 -->
+  <div class="bg-white p-4 rounded-xl shadow">
+    <h2 class="font-bold mb-2">進度紀錄</h2>
+    <ul id="logList"></ul>
+  </div>
+
+<script>
+
+let customers = []
+let projects = []
+let logs = []
+
+function addCustomer() {
+  const company = document.getElementById("company").value
+  const contact = document.getElementById("contact").value
+
+  if (!company) return alert("請輸入公司名稱")
+
+  customers.push({ company, contact })
+  renderCustomers()
+}
+
+function renderCustomers() {
+  const list = document.getElementById("customerList")
+  list.innerHTML = ""
+  customers.forEach(c => {
+    list.innerHTML += `<li class="py-1">🏢 ${c.company} - ${c.contact}</li>`
+  })
+}
+
+function addProject() {
+  const name = document.getElementById("projectName").value
+  const status = document.getElementById("status").value
+
+  if (!name) return alert("請輸入案件名稱")
+
+  projects.push({ name, status })
+  renderProjects()
+}
+
+function renderProjects() {
+  const list = document.getElementById("projectList")
+  list.innerHTML = ""
+  projects.forEach(p => {
+    list.innerHTML += `<li class="py-1">📦 ${p.name} (${p.status})</li>`
+  })
+}
+
+function addLog() {
+  const text = document.getElementById("logText").value
+
+  if (!text) return alert("請輸入內容")
+
+  logs.push(text)
+  renderLogs()
+}
+
+function renderLogs() {
+  const list = document.getElementById("logList")
+  list.innerHTML = ""
+  logs.forEach(l => {
+    list.innerHTML += `<li class="py-1">📝 ${l}</li>`
+  })
+}
+
+</script>
+
+</body>
+</html>
