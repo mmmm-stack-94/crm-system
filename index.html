@@ -18,7 +18,25 @@
         input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
     </style>
 
-    <script>
+<script>
+const API_BASE = 'https://script.google.com/macros/s/AKfycbzqNqsVfXRBuYI8EkhM0szIww_sqwA7xC_-ASr1_Kl7K3V917bbzGyzbE2Y3WvcWDyI/exec';
+
+async function apiGet(action) {
+  const res = await fetch(`${API_BASE}?action=${action}`);
+  return await res.json();
+}
+
+async function apiPost(action, payload) {
+  const res = await fetch(API_BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, payload })
+  });
+  return await res.json();
+}
+
+// 在 Alpine 載入前先定義資料邏輯
+document.addEventListener('alpine:init', () => {
         // 在 Alpine 載入前先定義資料邏輯
         document.addEventListener('alpine:init', () => {
             Alpine.data('crmApp', () => ({
@@ -42,17 +60,17 @@
 
                 // Main Data
                 customers: [
-                    { id: 'C1', companyName: '科技創新股份有限公司', taxId: '12345678', territory: '北區', industry: '軟體研發', address: '台北市', phone: '02-2720-0000', updatedAt: '2024-05-21' }
+                    { customerId: 'C1', companyName: '科技創新股份有限公司', taxId: '12345678', territory: '北區', industry: '軟體研發', address: '台北市', phone: '02-2720-0000', updatedAt: '2024-05-21' }
                 ],
                 contacts: [
-                    { id: 'CON1', customerId: 'C1', name: '林經理', title: 'IT總監', phone: '02-123', mobile: '0912', email: 'lin@tech.com' }
+                    { contactId: 'CON1', customerId: 'C1', name: '林經理', title: 'IT總監', phone: '02-123', mobile: '0912', email: 'lin@tech.com' }
                 ],
                 projects: [
-                    { id: 'P1', customerId: 'C1', projectName: '2024 雲端遷移專案', productType: 'AWS', bd: '業務A', opportunityDate: '2024-01-15', closeDate: '2024-12-20', status: '商機開發', publicCloudContact: '王小明', digitalContact: '數產一員', cloudContact: '雲端專員A', updatedAt: '2024-05-21' }
+                    { projectId: 'P1', customerId: 'C1', projectName: '2024 雲端遷移專案', productType: 'AWS', bd: '業務A', opportunityDate: '2024-01-15', closeDate: '2024-12-20', status: '商機開發', publicCloudContact: '王小明', digitalContact: '數產一員', cloudContact: '雲端專員A', updatedAt: '2024-05-21' }
                 ],
                 logs: [
-                    { id: 'L1', projectId: 'P1', content: '追蹤報價審核進度', isDone: false, createdAt: '2024-05-21', timestamp: 1716278400000 },
-                    { id: 'L2', projectId: 'P1', content: '與客戶開會確認需求', isDone: false, createdAt: '2024-05-20', timestamp: 1716184800000 }
+                    { logId: 'L1', projectId: 'P1', content: '追蹤報價審核進度', isDone: false, createdAt: '2024-05-21', timestamp: 1716278400000 },
+                    { logId: 'L2', projectId: 'P1', content: '與客戶開會確認需求', isDone: false, createdAt: '2024-05-20', timestamp: 1716184800000 }
                 ],
 
                 // Modal States
@@ -68,9 +86,22 @@
                 customerLocalContacts: [],
                 projectForm: {},
 
-                init() {
-                    this.$nextTick(() => { lucide.createIcons(); });
-                },
+                async init() {
+    const result = await apiGet('initData');
+
+    if (result.success) {
+        this.customers = result.data.customers;
+        this.contacts = result.data.contacts;
+        this.projects = result.data.projects;
+        this.logs = result.data.logs.map(l => ({
+            ...l,
+            isDone: String(l.isDone) === 'true'
+        }));
+        this.masterData = result.data.masterData;
+    }
+
+    this.$nextTick(() => { lucide.createIcons(); });
+},
 
                 login() {
                     this.isLoggedIn = true;
@@ -98,13 +129,13 @@
                         .slice(0, 10);
                 },
                 getCustomerName(pid) {
-                    const proj = this.projects.find(p => p.id === pid);
-                    const cust = this.customers.find(c => c.id === proj?.customerId);
-                    return cust?.companyName || '未知';
-                },
-                getProjectName(pid) {
-                    return this.projects.find(p => p.id === pid)?.projectName || '未知';
-                },
+    const proj = this.projects.find(p => p.projectId === pid);
+    const cust = this.customers.find(c => c.customerId === proj?.customerId);
+    return cust?.companyName || '未知';
+},
+                openProjectFromDashboard(pid) {
+    const proj = this.projects.find(p => p.id === pid);
+                    
                 openProjectFromDashboard(pid) {
                     const proj = this.projects.find(p => p.id === pid);
                     if (proj) {
@@ -118,10 +149,10 @@
                     if (c) {
                         this.editingCustomer = c;
                         this.customerForm = { ...c };
-                        this.customerLocalContacts = JSON.parse(JSON.stringify(this.contacts.filter(con => con.customerId === c.id)));
+                        this.customerLocalContacts.push({ contactId: 'CON' + Date.now(), name: '', title: '', phone: '', mobile: '', email: '' });
                     } else {
                         this.editingCustomer = null;
-                        this.customerForm = { id: 'C' + Date.now(), companyName: '', taxId: '', territory: this.masterData.territories[0], industry: '', address: '', phone: '' };
+                        this.customerForm = { customerId: 'C' + Date.now(), companyName: '', taxId: '', territory: this.masterData.territories[0], industry: '', address: '', phone: '' };
                         this.customerLocalContacts = [];
                     }
                     this.customerModalOpen = true;
@@ -169,7 +200,7 @@
                         this.projectForm = { ...p };
                     } else {
                         this.editingProject = null;
-                        this.projectForm = { id: 'P' + Date.now(), customerId: this.customers[0]?.id, projectName: '', productType: 'AWS', bd: '業務A', opportunityDate: '', closeDate: '', status: '商機開發', publicCloudContact: '王小明', digitalContact: '數產一員', cloudContact: '雲端專員A' };
+                        this.projectForm = { projectId: 'P' + Date.now(), customerId: this.customers[0]?.id, projectName: '', productType: 'AWS', bd: '業務A', opportunityDate: '', closeDate: '', status: '商機開發', publicCloudContact: '王小明', digitalContact: '數產一員', cloudContact: '雲端專員A' };
                     }
                     this.projectModalOpen = true;
                     this.$nextTick(() => { lucide.createIcons(); });
@@ -191,7 +222,7 @@
                     if (!this.newLogInput.trim()) return;
                     const now = new Date();
                     this.logs.push({
-                        id: 'L' + Date.now(),
+                        logId: 'L' + Date.now(),
                         projectId: this.projectForm.id,
                         content: this.newLogInput,
                         isDone: false,
