@@ -103,11 +103,22 @@ document.addEventListener('alpine:init', () => {
     this.$nextTick(() => { lucide.createIcons(); });
 },
 
-                login() {
-                    this.isLoggedIn = true;
-                    this.view = 'dashboard';
-                    this.$nextTick(() => { lucide.createIcons(); });
-                },
+                async login() {
+    const result = await apiPost('login', {
+        account: this.loginForm.account,
+        password: this.loginForm.password
+    });
+
+    if (!result.success) {
+        alert(result.message || '登入失敗');
+        return;
+    }
+
+    this.isLoggedIn = true;
+    this.userAccount = result.user.userName || result.user.account;
+    this.view = 'dashboard';
+    this.$nextTick(() => { lucide.createIcons(); });
+},
 
                 logout() {
                     this.isLoggedIn = false;
@@ -133,16 +144,13 @@ document.addEventListener('alpine:init', () => {
     const cust = this.customers.find(c => c.customerId === proj?.customerId);
     return cust?.companyName || '未知';
 },
-                openProjectFromDashboard(pid) {
-    const proj = this.projects.find(p => p.id === pid);
-                    
-                openProjectFromDashboard(pid) {
-                    const proj = this.projects.find(p => p.id === pid);
-                    if (proj) {
-                        this.view = 'projects';
-                        this.openProjectModal(proj);
-                    }
-                },
+openProjectFromDashboard(pid) {
+    const proj = this.projects.find(p => p.projectId === pid);
+    if (proj) {
+        this.view = 'projects';
+        this.openProjectModal(proj);
+    }
+},
 
                 // Customer Logic
                 openCustomerModal(c = null) {
@@ -159,31 +167,41 @@ document.addEventListener('alpine:init', () => {
                     this.$nextTick(() => { lucide.createIcons(); });
                 },
                 closeCustomerModal() { this.customerModalOpen = false; },
-                addLocalContact() {
-                    this.customerLocalContacts.push({ id: 'CON' + Date.now(), name: '', title: '', phone: '', mobile: '', email: '' });
-                    this.$nextTick(() => { lucide.createIcons(); });
-                },
-                removeLocalContact(id) { this.customerLocalContacts = this.customerLocalContacts.filter(c => c.id !== id); },
-                saveCustomer() {
-                    const now = new Date().toISOString().split('T')[0];
-                    this.customerForm.updatedAt = now;
-                    if (this.editingCustomer) {
-                        this.customers = this.customers.map(c => c.id === this.customerForm.id ? { ...this.customerForm } : c);
-                    } else {
-                        this.customers.push({ ...this.customerForm });
-                    }
-                    this.contacts = [
-                        ...this.contacts.filter(con => con.customerId !== this.customerForm.id),
-                        ...this.customerLocalContacts.map(con => ({ ...con, customerId: this.customerForm.id }))
-                    ];
-                    this.closeCustomerModal();
-                },
-                deleteCustomer(id) {
-                    if (confirm('確定要刪除此客戶嗎？所有關聯資料也將移除。')) {
-                        this.customers = this.customers.filter(c => c.id !== id);
-                        this.projects = this.projects.filter(p => p.customerId !== id);
-                    }
-                },
+addLocalContact() {
+    this.customerLocalContacts.push({ contactId: 'CON' + Date.now(), name: '', title: '', phone: '', mobile: '', email: '' });
+    this.$nextTick(() => { lucide.createIcons(); });
+},
+removeLocalContact(contactId) {
+    this.customerLocalContacts = this.customerLocalContacts.filter(c => c.contactId !== contactId);
+},
+saveCustomer() {
+    const now = new Date().toISOString().split('T')[0];
+    this.customerForm.updatedAt = now;
+
+    if (this.editingCustomer) {
+        this.customers = this.customers.map(c =>
+            c.customerId === this.customerForm.customerId ? { ...this.customerForm } : c
+        );
+    } else {
+        this.customers.push({ ...this.customerForm });
+    }
+
+    this.contacts = [
+        ...this.contacts.filter(con => con.customerId !== this.customerForm.customerId),
+        ...this.customerLocalContacts.map(con => ({
+            ...con,
+            customerId: this.customerForm.customerId
+        }))
+    ];
+
+    this.closeCustomerModal();
+},
+               deleteCustomer(customerId) {
+    if (confirm('確定要刪除此客戶嗎？所有關聯資料也將移除。')) {
+        this.customers = this.customers.filter(c => c.customerId !== customerId);
+        this.projects = this.projects.filter(p => p.customerId !== customerId);
+    }
+},
 
                 // Project Logic
                 sortedProjects() {
@@ -192,7 +210,7 @@ document.addEventListener('alpine:init', () => {
                         return new Date(b.updatedAt) - new Date(a.updatedAt);
                     });
                 },
-                getCustomerNameById(cid) { return this.customers.find(c => c.id === cid)?.companyName || ''; },
+                getCustomerNameById(cid) { return this.customers.find(c => c.customerId === cid)?.companyName || ''; },
                 countPendingLogs(pid) { return this.logs.filter(l => l.projectId === pid && !l.isDone).length; },
                 openProjectModal(p = null) {
                     if (p) {
@@ -200,7 +218,7 @@ document.addEventListener('alpine:init', () => {
                         this.projectForm = { ...p };
                     } else {
                         this.editingProject = null;
-                        this.projectForm = { projectId: 'P' + Date.now(), customerId: this.customers[0]?.id, projectName: '', productType: 'AWS', bd: '業務A', opportunityDate: '', closeDate: '', status: '商機開發', publicCloudContact: '王小明', digitalContact: '數產一員', cloudContact: '雲端專員A' };
+                        this.projectForm = { projectId: 'P' + Date.now(), customerId: this.customers[0]?.customerId, projectName: '', productType: 'AWS', bd: '業務A', opportunityDate: '', closeDate: '', status: '商機開發', publicCloudContact: '王小明', digitalContact: '數產一員', cloudContact: '雲端專員A' };
                     }
                     this.projectModalOpen = true;
                     this.$nextTick(() => { lucide.createIcons(); });
@@ -209,21 +227,21 @@ document.addEventListener('alpine:init', () => {
                 saveProject() {
                     this.projectForm.updatedAt = new Date().toISOString().split('T')[0];
                     if (this.editingProject) {
-                        this.projects = this.projects.map(p => p.id === this.projectForm.id ? { ...this.projectForm } : p);
+                        this.projects = this.projects.map(p => p.projectId === this.projectForm.projectId ? { ...this.projectForm } : p);
                     } else {
                         this.projects.push({ ...this.projectForm });
                     }
                     this.closeProjectModal();
                 },
                 getProjectLogs() {
-                    return this.logs.filter(l => l.projectId === this.projectForm.id).sort((a, b) => b.timestamp - a.timestamp);
+                    return this.logs.filter(l => l.projectId === this.projectForm.projectId).sort((a, b) => b.timestamp - a.timestamp);
                 },
                 addNewLog() {
                     if (!this.newLogInput.trim()) return;
                     const now = new Date();
                     this.logs.push({
                         logId: 'L' + Date.now(),
-                        projectId: this.projectForm.id,
+                        projectId: this.projectForm.projectId,
                         content: this.newLogInput,
                         isDone: false,
                         createdAt: now.toISOString().split('T')[0],
@@ -233,10 +251,10 @@ document.addEventListener('alpine:init', () => {
                     this.$nextTick(() => { lucide.createIcons(); });
                 },
                 toggleLogStatus(lid) {
-                    this.logs = this.logs.map(l => l.id === lid ? { ...l, isDone: !l.isDone, timestamp: Date.now() } : l);
+                    this.logs = this.logs.map(l => l.logId === lid ? { ...l, isDone: !l.isDone, timestamp: Date.now() } : l);
                     this.$nextTick(() => { lucide.createIcons(); });
                 },
-                deleteLog(lid) { this.logs = this.logs.filter(l => l.id !== lid); },
+                deleteLog(lid) { this.logs = this.logs.filter(l => l.logId !== lid); },
                 updateLogDate(log, val) {
                     if (!val) { this.editingLogDateId = null; return; }
                     log.createdAt = val;
@@ -406,17 +424,17 @@ document.addEventListener('alpine:init', () => {
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-50">
-                                    <template x-for="c in customers" :key="c.id">
+                                    <template x-for="c in customers" :key="c.customerId">
                                         <tr class="hover:bg-blue-50/40 transition-colors group">
                                             <td class="px-6 py-5 font-bold text-slate-900 group-hover:text-blue-600 transition-colors" x-text="c.companyName"></td>
                                             <td class="px-6 py-5"><span class="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-bold" x-text="c.territory"></span></td>
                                             <td class="px-6 py-5 text-slate-500 font-medium" x-text="c.industry"></td>
-                                            <td class="px-6 py-5 text-center font-bold text-slate-400" x-text="contacts.filter(con => con.customerId === c.id).length"></td>
+                                            <td class="px-6 py-5 text-center font-bold text-slate-400"x-text="contacts.filter(con => con.customerId === c.customerId).length"></td>
                                             <td class="px-6 py-5 text-slate-500 font-medium" x-text="c.updatedAt"></td>
                                             <td class="px-6 py-5">
                                                 <div class="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button @click="openCustomerModal(c)" class="p-2.5 bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-blue-600 shadow-sm"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
-                                                    <button @click="deleteCustomer(c.id)" class="p-2.5 bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-red-600 shadow-sm"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                                    <button @click="deleteCustomer(c.customerId)" class="p-2.5 bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-red-600 shadow-sm"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -441,12 +459,12 @@ document.addEventListener('alpine:init', () => {
                             </button>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                            <template x-for="p in sortedProjects()" :key="p.id">
+                            <template x-for="p in sortedProjects()" :key="p.projectId">
                                 <div @click="openProjectModal(p)" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all group relative overflow-hidden cursor-pointer">
                                     <div :class="p.status === '成案' ? 'bg-emerald-500' : p.status === 'Fail' ? 'bg-red-500' : 'bg-indigo-500'" class="absolute top-0 left-0 w-1.5 h-full"></div>
                                     <div class="flex justify-between items-start mb-4">
                                         <span :class="p.status === '成案' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'" class="px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest" x-text="p.status"></span>
-                                        <template x-if="countPendingLogs(p.id) > 0">
+                                        <template x-if="countPendingLogs(p.projectId) > 0">
                                             <span class="flex items-center gap-1 text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
                                                 <i data-lucide="clock" class="w-2.5 h-2.5"></i> <span x-text="countPendingLogs(p.id)"></span> 待辦
                                             </span>
@@ -570,7 +588,7 @@ document.addEventListener('alpine:init', () => {
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <label class="md:col-span-2 block"><span class="text-[10px] font-black text-slate-400 uppercase">隸屬客戶</span>
                                 <select x-model="projectForm.customerId" class="w-full px-4 py-2.5 bg-slate-50 border rounded-xl font-bold outline-none">
-                                    <template x-for="c in customers"><option :value="c.id" x-text="c.companyName"></option></template>
+                                    <template x-for="c in customers"><option :value="c.customerId" x-text="c.companyName"></option></template>
                                 </select>
                             </label>
                             <label class="md:col-span-2 block"><span class="text-[10px] font-black text-slate-400 uppercase">專案名稱</span>
@@ -624,9 +642,9 @@ document.addEventListener('alpine:init', () => {
                             <button @click="addNewLog()" class="p-2 bg-indigo-600 text-white rounded-xl shadow-md hover:bg-indigo-700 active:scale-95"><i data-lucide="plus"></i></button>
                         </div>
                         <div class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
-                            <template x-for="log in getProjectLogs()" :key="log.id">
+                            <template x-for="log in getProjectLogs()" :key="log.logId">
                                 <div class="flex gap-4 p-4 bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-indigo-200 transition-all group">
-                                    <button @click="toggleLogStatus(log.id)" class="shrink-0 mt-0.5">
+                                    <button @click="toggleLogStatus(log.logId)" class="shrink-0 mt-0.5">
                                         <i :data-lucide="log.isDone ? 'check-square' : 'square'" :class="log.isDone ? 'text-emerald-500' : 'text-slate-300'"></i>
                                     </button>
                                     <div class="min-w-0 flex-1">
@@ -642,7 +660,7 @@ document.addEventListener('alpine:init', () => {
                                             <input x-show="editingLogDateId === log.id" @blur="updateLogDate(log, $el.value)" @keydown.enter="updateLogDate(log, $el.value)" type="date" :value="log.createdAt" class="text-[10px] font-bold border border-slate-200 rounded px-1 outline-none" x-init="$nextTick(() => { if(editingLogDateId === log.id) $el.focus() })">
                                         </div>
                                     </div>
-                                    <button @click="deleteLog(log.id)" class="text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    <button @click="deleteLog(log.logId)" class="text-slate-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                 </div>
                             </template>
                         </div>
